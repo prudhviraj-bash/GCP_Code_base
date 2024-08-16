@@ -1,0 +1,29 @@
+steps:
+#FIRST CLONE FROM GOOGLE CLOUD SOURCE REPOSITORY
+- name: 'gcr.io/cloud-builders/git'
+  args: [ 'clone' , 'https://source.developers.google.com/p/${_SRCPROJECT}/r/${_REPO_NAME}']
+  
+# CHANGE THE PROJECT ID AND BUCKET NAME IN YAML.FILE
+- name: 'gcr.io/cloud-builders/gcloud'
+  entrypoint: 'bash'
+  id: ''
+  args:
+  - '-c'
+  - |
+        sed -i -e s/\$\{GCP_ENV\}/${_GCP_ENV}/g stock.YAML
+        
+  dir: 'code/gcs2bq'
+  
+#build the dcoker image
+
+- name: 'gcr.io/cloud-builders/gcloud'
+  args: [ 'builds' , 'submit' , '--tag' , 'gcr.io/${_DSTPROJECT}/${_CONTAINERNAME}:$COMMIT_SHA','.']
+  dir: 'code/gcs2bq'
+
+#set project_id to apmena-onedata-kr-apac-${GCP_ENV}
+- name: 'gcr.io/cloud-builders/gcloud'
+  args: ['config' , 'set' ,'project' , '${_DSTPROJECT}']
+
+#DEPLOYMENT TO CLOUD RUN
+- name: 'gcr.io/cloud-builders/gcloud'
+  args: ['beta' , 'run', 'deploy', '${_SERVICE_NAME}' , '--image', 'gcr.io/{_DSTPROJECT}/${_CONTAINERNAME}:$COMMIT_SHA', '--region', 'asia-east2', '--platform' , 'managed' , '--memory' , '8Gi' , '--cpu' , '4' ,'--timeout' , '3600', 'no_allow_unathenticated' , '--set-env-vars' , 'GCP_PROJECT_ID=${_DSTPROJECT}']
